@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบคำนวณเวรและบริหารการเงิน</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-20">
+
+    <!-- Header -->
+    <header class="bg-indigo-600 text-white p-4 shadow-md sticky top-0 z-50">
+        <div class="max-w-md mx-auto flex flex-col gap-2">
+            <div class="flex justify-between items-center">
+                <h1 class="text-base font-bold">💰 จัดการเวร & การเงิน</h1>
+            </div>
+            <!-- Month & Year Selector Bar -->
+            <div class="flex gap-2">
+                <select id="selectMonthOnly" onchange="onMonthYearChange()" class="flex-1 bg-indigo-700 text-white text-xs font-medium px-3 py-2 rounded-lg border border-indigo-500 focus:outline-none">
+                    <option value="01">มกราคม</option>
+                    <option value="02">กุมภาพันธ์</option>
+                    <option value="03">มีนาคม</option>
+                    <option value="04">เมษายน</option>
+                    <option value="05">พฤษภาคม</option>
+                    <option value="06">มิถุนายน</option>
+                    <option value="07">กรกฎาคม</option>
+                    <option value="08">สิงหาคม</option>
+                    <option value="09">กันยายน</option>
+                    <option value="10">ตุลาคม</option>
+                    <option value="11">พฤศจิกายน</option>
+                    <option value="12">ธันวาคม</option>
+                </select>
+                <select id="selectYearOnly" onchange="onMonthYearChange()" class="w-28 bg-indigo-700 text-white text-xs font-medium px-3 py-2 rounded-lg border border-indigo-500 focus:outline-none">
+                    <!-- Javascript will populate years -->
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="bg-white border-b border-slate-200 sticky top-24 sm:top-20 z-40 shadow-sm">
+        <div class="max-w-md mx-auto flex justify-around">
+            <button onclick="switchTab('shift')" id="tabBtn-shift" class="flex-1 py-3 text-center text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 transition-colors">เวร & รายรับ</button>
+            <button onclick="switchTab('expense')" id="tabBtn-expense" class="flex-1 py-3 text-center text-sm font-semibold text-slate-400 border-b-2 border-transparent transition-colors">รายจ่าย & ออม</button>
+            <button onclick="switchTab('summary')" id="tabBtn-summary" class="flex-1 py-3 text-center text-sm font-semibold text-slate-400 border-b-2 border-transparent transition-colors">สรุป & วิเคราะห์</button>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="max-w-md mx-auto p-4 space-y-6">
+
+        <!-- TAB 1: SHIFTS & INCOME -->
+        <section id="tab-shift" class="space-y-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                <div class="flex justify-between items-center">
+                    <label class="font-semibold text-sm text-slate-700">เงินเดือนพื้นฐาน (บาท)</label>
+                    <button onclick="openSettingsModal()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2.5 py-1.5 rounded-lg font-medium transition-colors">⚙️ ตั้งค่าเรทเวร</button>
+                </div>
+                <input type="number" id="baseSalary" min="0" oninput="validateNumber(this); updateBaseSalary(this.value);" placeholder="กรอกเงินเดือน" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none text-right font-semibold text-indigo-600">
+                
+                <div class="pt-2 border-t border-slate-100 flex gap-2">
+                    <button onclick="openShiftSelector()" class="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold py-2.5 rounded-xl transition-colors">📋 เลือกเวรที่จะลง</button>
+                    <button onclick="copyFromPreviousMonth()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2.5 rounded-xl transition-colors">🔄 คัดลอกเดือนก่อน</button>
+                </div>
+            </div>
+
+            <div id="shiftsContainer" class="space-y-3"></div>
+
+            <div class="bg-indigo-900 text-white p-4 rounded-2xl shadow-md space-y-2">
+                <h3 class="text-xs font-medium text-indigo-200 uppercase tracking-wider">สรุปรายรับเดือนนี้</h3>
+                <div class="flex justify-between text-sm">
+                    <span>จำนวนเวรรวมทั้งหมด:</span>
+                    <span id="totalShiftCount" class="font-bold">0 เวร</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span>เงินรวมค่าเวร:</span>
+                    <span id="totalShiftMoney" class="font-bold">0 บาท</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span>เงินเดือน + ค่าเวร:</span>
+                    <span id="totalMonthlyIncome" class="font-bold text-emerald-400">0 บาท</span>
+                </div>
+                <div class="pt-2 border-t border-indigo-800 flex justify-between text-xs text-indigo-300">
+                    <span>รายได้รวมสะสมถึงเดือนล่าสุด:</span>
+                    <span id="cumulativeIncome" class="font-semibold text-white">0 บาท</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: EXPENSES & SAVINGS -->
+        <section id="tab-expense" class="hidden space-y-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                <h3 class="font-bold text-sm text-slate-800 border-b pb-2">📌 รายจ่ายประจำ & เงินออม</h3>
+                <div id="fixedExpensesContainer" class="space-y-2.5"></div>
+                <button onclick="addCustomExpenseField()" class="w-full mt-2 border-2 border-dashed border-slate-200 hover:border-indigo-300 text-slate-500 hover:text-indigo-600 text-xs font-semibold py-2 rounded-xl transition-colors">+ เพิ่มรายการรายจ่าย/ออม</button>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <h3 class="font-bold text-sm text-slate-800">🍜 ค่าอาหารประจำวัน</h3>
+                    <span id="totalDailyFood" class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">รวม: 0 บาท</span>
+                </div>
+                <div id="dailyFoodContainer" class="grid grid-cols-6 gap-1.5 max-h-48 overflow-y-auto p-1"></div>
+            </div>
+        </section>
+
+        <!-- TAB 3: SUMMARY & ANALYSIS -->
+        <section id="tab-summary" class="hidden space-y-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                <h3 class="font-bold text-sm text-slate-800 border-b pb-2">📊 สรุปผลการเงินประจำเดือน</h3>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between text-slate-600">
+                        <span>รายได้ทั้งหมด (เงินเดือน+เวร):</span>
+                        <span id="sumTotalIncome" class="font-semibold text-indigo-600">0 บาท</span>
+                    </div>
+                    <div class="flex justify-between text-slate-600">
+                        <span>รายจ่ายทั้งหมดประจำเดือน:</span>
+                        <span id="sumTotalExpense" class="font-semibold text-rose-500">0 บาท</span>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-500 pl-2">
+                        <span>- รายจ่ายประจำ + อาหาร:</span>
+                        <span id="sumExpenseBreakdown">0 บาท</span>
+                    </div>
+                    <div class="pt-2 border-t border-slate-100 flex justify-between text-base font-bold">
+                        <span>เงินเหลือสุทธิประจำเดือน:</span>
+                        <span id="sumNetBalance" class="text-emerald-600">0 บาท</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+                <h3 class="font-bold text-sm text-slate-800 border-b pb-2">📈 แผนภูมิวิเคราะห์สัดส่วน</h3>
+                <div class="space-y-6">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 text-center mb-2">สัดส่วนรายรับ vs รายจ่าย</p>
+                        <div class="w-full h-48 flex justify-center items-center">
+                            <canvas id="incomeExpenseChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="pt-4 border-t border-slate-100">
+                        <p class="text-xs font-semibold text-slate-500 text-center mb-2">สัดส่วนประเภทรายจ่าย</p>
+                        <div class="w-full h-48 flex justify-center items-center">
+                            <canvas id="expenseBreakdownChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cumulative Expenses Card -->
+            <div class="bg-rose-900 text-white p-4 rounded-2xl shadow-md space-y-2">
+                <h3 class="text-xs font-medium text-rose-200 uppercase tracking-wider">📉 รายจ่ายสะสมภาพรวม</h3>
+                <div class="flex justify-between text-sm">
+                    <span>รายจ่ายสะสมถึงเดือนล่าสุด:</span>
+                    <span id="cumulativeExpense" class="font-bold text-rose-300">0 บาท</span>
+                </div>
+                <div class="text-[11px] text-rose-200/80">
+                    *คำนวณจากผลรวมรายจ่ายและค่าอาหารทุกเดือนตั้งแต่อดีตจนถึงเดือนที่เลือก
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                <h3 class="font-bold text-sm text-slate-800 border-b pb-2">🏦 ยอดสะสมเงินออม (ทบยอดธนาคาร)</h3>
+                <div id="savingsAccumulationContainer" class="space-y-2 text-sm"></div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                <h3 class="font-bold text-sm text-slate-800 border-b pb-2">📈 วิเคราะห์แนวโน้ม</h3>
+                <p id="trendAnalysisText" class="text-xs text-slate-600 leading-relaxed">กำลังวิเคราะห์ข้อมูล...</p>
+            </div>
+
+            <!-- Backup & Restore Section -->
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                <h3 class="font-bold text-sm text-slate-800 border-b pb-2">💾 สำรอง & กู้คืนข้อมูล (ป้องกันข้อมูลหาย)</h3>
+                <div class="flex gap-2">
+                    <button onclick="backupAllData()" class="flex-1 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold py-2.5 rounded-xl transition-colors">
+                        📤 สำรองข้อมูลเก็บไว้
+                    </button>
+                    <label class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2.5 rounded-xl transition-colors text-center cursor-pointer flex items-center justify-center">
+                        📥 กู้คืนข้อมูล
+                        <input type="file" id="restoreFile" accept=".json" onchange="restoreAllData(event)" class="hidden">
+                    </label>
+                </div>
+                <p class="text-[11px] text-slate-400 text-center">
+                    *แนะนำให้กดสำรองข้อมูลเก็บไว้ในเครื่องหรือส่งเข้าไลน์ตัวเองเป็นระยะ เพื่อป้องกันข้อมูลหายเวลาเปลี่ยนมือถือ
+                </p>
+            </div>
+
+            <!-- Export Excel Button -->
+            <button onclick="exportToExcel()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-2xl shadow-sm text-sm transition-colors flex items-center justify-center gap-2">
+                📥 ดาวน์โหลดสรุป Excel (CSV)
+            </button>
+        </section>
+
+    </main>
+
+    <!-- MODAL: Shift Selector -->
+    <div id="shiftSelectorModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl max-h-[85vh] flex flex-col shadow-xl">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="font-bold text-base text-slate-800">เลือกเวรสำหรับเดือนนี้</h3>
+                <button onclick="closeShiftSelector()" class="text-slate-400 hover:text-slate-600 p-1">✕</button>
+            </div>
+            <div id="shiftSelectorList" class="p-4 overflow-y-auto space-y-2 flex-1"></div>
+            <div class="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 rounded-b-2xl">
+                <button onclick="selectAllShifts(true)" class="flex-1 bg-slate-200 text-slate-700 font-semibold py-2 rounded-xl text-xs">เลือกทั้งหมด</button>
+                <button onclick="saveSelectedShifts()" class="flex-1 bg-indigo-600 text-white font-semibold py-2 rounded-xl text-xs shadow-sm">บันทึกการเลือก</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Settings -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl max-h-[85vh] flex flex-col shadow-xl">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="font-bold text-base text-slate-800">⚙️ ตั้งค่าเรทเวร & เพิ่มเวร</h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 p-1">✕</button>
+            </div>
+            <div class="p-4 overflow-y-auto space-y-4 flex-1">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                    <h4 class="font-semibold text-xs text-indigo-600 uppercase">➕ เพิ่มเวรใหม่</h4>
+                    <input type="text" id="newShiftName" placeholder="ชื่อเวรใหม่" class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs">
+                    <div class="flex gap-2">
+                        <input type="number" id="newShiftRate" placeholder="เรทเงิน (บาท)" min="0" oninput="validateNumber(this)" class="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs">
+                        <button onclick="addNewCustomShift()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-semibold">เพิ่ม</button>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <h4 class="font-semibold text-xs text-slate-500 uppercase">แก้ไขเรทเวรที่มีอยู่</h4>
+                    <div id="rateEditorList" class="space-y-2"></div>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-100 bg-slate-50 rounded-b-2xl">
+                <button onclick="closeSettingsModal(); loadAppData();" class="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-xl text-xs">เสร็จสิ้น</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const defaultShifts = [
+            { id: 'portable_morning', name: 'เวร Portable (เช้า)', rate: 1200, category: 'Portable' },
+            { id: 'portable_afternoon', name: 'เวร Portable (บ่าย)', rate: 1600, category: 'Portable' },
+            { id: 'portable_night', name: 'เวร Portable (ดึก)', rate: 500, category: 'Portable' },
+            { id: 'portable_night_noff', name: 'เวร Portable (ดึกไม่ออฟ)', rate: 1700, category: 'Portable' },
+            { id: 'ergen_morning', name: 'เวร ER Gen (เช้า)', rate: 1200, category: 'ER Gen' },
+            { id: 'ergen_afternoon', name: 'เวร ER Gen (บ่าย)', rate: 1600, category: 'ER Gen' },
+            { id: 'ergen_night', name: 'เวร ER Gen (ดึก)', rate: 500, category: 'ER Gen' },
+            { id: 'ergen_night_noff', name: 'เวร ER Gen (ดึกไม่ออฟ)', rate: 1700, category: 'ER Gen' },
+            { id: 'ipdoncall_morning', name: 'เวร IPD on call (เช้า)', rate: 1200, category: 'IPD on call' },
+            { id: 'ipdoncall_afternoon', name: 'เวร IPD on call (บ่าย)', rate: 2400, category: 'IPD on call' },
+            { id: 'ctipd_morning', name: 'เวร CTIPD (เช้า)', rate: 1200, category: 'CTIPD' },
+            { id: 'ctipd_afternoon', name: 'เวร CTIPD (บ่าย)', rate: 2400, category: 'CTIPD' },
+            { id: 'cter_morning', name: 'เวร CTER (เช้า)', rate: 1200, category: 'CTER' },
+            { id: 'cter_afternoon', name: 'เวร CTER (บ่าย)', rate: 2400, category: 'CTER' },
+            { id: 'premium', name: 'เวรพรีเมียม', rate: 2000, category: 'พิเศษ' },
+            { id: 'special_clinic', name: 'คลินิกพิเศษ', rate: 1000, category: 'พิเศษ' },
+            { id: 'or_afternoon', name: 'เวร OR (บ่าย)', rate: 1000, category: 'OR' },
+            { id: 'or_morning', name: 'เวร OR (เช้า)', rate: 1100, category: 'OR' },
+            { id: 'ot', name: 'เวรระบุโอที (ชม.)', rate: 286, category: 'OT' }
+        ];
+
+        const defaultExpenses = [
+            { id: 'condo', name: 'ค่าคอนโด', defaultAmount: 0 },
+            { id: 'car', name: 'ค่างวดรถ', defaultAmount: 0 },
+            { id: 'electric', name: 'ค่าไฟ', defaultAmount: 0 },
+            { id: 'water', name: 'ค่าน้ำ', defaultAmount: 0 },
+            { id: 'credit', name: 'ค่าบัตรเครดิต', defaultAmount: 0 },
+            { id: 'monthly', name: 'ค่าใช้จ่ายรายเดือน', defaultAmount: 0 },
+            { id: 'provident', name: 'ค่าสำรองเลี้ยงชีพ', defaultAmount: 0 },
+            { id: 'savings', name: 'เงินเก็บสะสม', defaultAmount: 0 },
+            { id: 'travel', name: 'เงินเที่ยว', defaultAmount: 0 }
+        ];
+
+        let currentMonthKey = '';
+        let incomeExpenseChartInstance = null;
+        let expenseBreakdownChartInstance = null;
+
+        window.onload = function() {
+            initYearDropdown();
+            setCurrentMonthYearSelectors();
+            loadAppData();
+        };
+
+        function initYearDropdown() {
+            const yearSelect = document.getElementById('selectYearOnly');
+            yearSelect.innerHTML = '';
+            const currentYear = new Date().getFullYear();
+            
+            for (let y = currentYear - 3; y <= currentYear + 3; y++) {
+                const option = document.createElement('option');
+                option.value = y;
+                option.textContent = `พ.ศ. ${y + 543}`;
+                yearSelect.appendChild(option);
+            }
+        }
+
+        function setCurrentMonthYearSelectors() {
+            const now = new Date();
+            const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+            const currentYear = now.getFullYear();
+
+            document.getElementById('selectMonthOnly').value = currentMonth;
+            document.getElementById('selectYearOnly').value = currentYear;
+            
+            updateCurrentMonthKey();
+        }
+
+        function updateCurrentMonthKey() {
+            const m = document.getElementById('selectMonthOnly').value;
+            const y = document.getElementById('selectYearOnly').value;
+            currentMonthKey = `${y}-${m}`;
+        }
+
+        function onMonthYearChange() {
+            updateCurrentMonthKey();
+            loadAppData();
+        }
+
+        function getGlobalConfig() {
+            let config = localStorage.getItem('app_global_config');
+            if (!config) {
+                config = { shifts: defaultShifts, expenses: defaultExpenses };
+                localStorage.setItem('app_global_config', JSON.stringify(config));
+                return config;
+            }
+            return JSON.parse(config);
+        }
+
+        function saveGlobalConfig(config) {
+            localStorage.setItem('app_global_config', JSON.stringify(config));
+        }
+
+        function getMonthData(monthKey) {
+            let data = localStorage.getItem(`app_month_${monthKey}`);
+            const globalConfig = getGlobalConfig();
+            
+            if (!data) {
+                let defaultActive = globalConfig.shifts.map(s => s.id);
+                let defaultFood = {};
+                for(let i=1; i<=31; i++) defaultFood[i] = 0;
+
+                let defaultExpVals = {};
+                globalConfig.expenses.forEach(e => defaultExpVals[e.id] = e.defaultAmount);
+
+                data = {
+                    baseSalary: 0,
+                    activeShifts: defaultActive,
+                    shiftCounts: {},
+                    expenses: defaultExpVals,
+                    customExpenses: [],
+                    dailyFood: defaultFood
+                };
+            } else {
+                data = JSON.parse(data);
+            }
+            return data;
+        }
+
+        function validateNumber(input) {
+            if (input.value < 0) input.value = 0;
+        }
+
+        function updateBaseSalary(val) {
+            let data = getMonthData(currentMonthKey);
+            data.baseSalary = Number(val) || 0;
+            localStorage.setItem(`app_month_${currentMonthKey}`, JSON.stringify(data));
+            updateTotalsDisplay();
+        }
+
+        function switchTab(tabName) {
+            ['shift', 'expense', 'summary'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                document.getElementById(`tabBtn-${t}`).className = "flex-1 py-3 text-center text-sm font-semibold text-slate-400 border-b-2 border-transparent transition-colors";
+            });
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            document.getElementById(`tabBtn-${tabName}`).className = "flex-1 py-3 text-center text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 transition-colors";
+            
+            if(tabName === 'summary') {
+                updateSummaryTab();
+            }
+        }
+
+        function loadAppData() {
+            const globalConfig = getGlobalConfig();
+            const data = getMonthData(currentMonthKey);
+
+            document.getElementById('baseSalary').value = data.baseSalary || '';
+
+            const shiftsContainer = document.getElementById('shiftsContainer');
+            shiftsContainer.innerHTML = '';
+
+            globalConfig.shifts.forEach(shift => {
+                if (!data.activeShifts.includes(shift.id)) return;
+
+                const count = data.shiftCounts[shift.id] || 0;
+                const sum = count * shift.rate;
+
+                const div = document.createElement('div');
+                div.className = "bg-white p-3.5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between gap-3";
+                div.innerHTML = `
+                    <div class="flex-1">
+                        <div class="font-semibold text-xs text-slate-800">${shift.name}</div>
+                        <div class="text-[11px] text-slate-400">เรท: ${shift.rate.toLocaleString()} บาท</div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="number" min="0" value="${count}" data-shift-id="${shift.id}" data-rate="${shift.rate}" oninput="validateNumber(this); handleShiftInput(this)" class="shift-input w-16 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-center font-semibold text-sm text-indigo-600 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <span id="sum_${shift.id}" class="text-xs text-slate-500 w-16 text-right">${sum.toLocaleString()} ฿</span>
+                    </div>
+                `;
+                shiftsContainer.appendChild(div);
+            });
+
+            updateTotalsDisplay();
+            renderExpensesTab(data, globalConfig);
+        }
+
+        function handleShiftInput(input) {
+            const shiftId = input.getAttribute('data-shift-id');
+            const rate = Number(input.getAttribute('data-rate'));
+            const count = Number(input.value) || 0;
+            const sum = count * rate;
+
+            document.getElementById(`sum_${shiftId}`).innerText = `${sum.toLocaleString()} ฿`;
+
+            let data = getMonthData(currentMonthKey);
+            data.shiftCounts[shiftId] = count;
+            localStorage.setItem(`app_month_${currentMonthKey}`, JSON.stringify(data));
+
+            updateTotalsDisplay();
+        }
+
+        function updateTotalsDisplay() {
+            const globalConfig = getGlobalConfig();
+            const data = getMonthData(currentMonthKey);
+            
+            let totalShiftsCount = 0;
+            let totalShiftsMoney = 0;
+
+            globalConfig.shifts.forEach(shift => {
+                if (!data.activeShifts.includes(shift.id)) return;
+                const count = Number(data.shiftCounts[shift.id]) || 0;
+                totalShiftsCount += count;
+                totalShiftsMoney += (count * shift.rate);
+            });
+
+            const baseSalary = Number(data.baseSalary) || 0;
+            const totalMonthlyIncome = baseSalary + totalShiftsMoney;
+
+            document.getElementById('totalShiftCount').innerText = `${totalShiftsCount} เวร`;
+            document.getElementById('totalShiftMoney').innerText = `${totalShiftsMoney.toLocaleString()} บาท`;
+            document.getElementById('totalMonthlyIncome').innerText = `${totalMonthlyIncome.toLocaleString()} บาท`;
+            document.getElementById('cumulativeIncome').innerText = `${calculateCumulativeIncome().toLocaleString()} บาท`;
+        }
+
+        function calculateCumulativeIncome() {
+            let total = 0;
+            const yearSelect = document.getElementById('selectYearOnly');
+            
+            for (let i = 0; i < yearSelect.options.length; i++) {
+                const y = yearSelect.options[i].value;
+                for (let m = 1; m <= 12; m++) {
+                    const mStr = String(m).padStart(2, '0');
+                    const mKey = `${y}-${mStr}`;
+                    if (mKey <= currentMonthKey) {
+                        let mData = localStorage.getItem(`app_month_${mKey}`);
+                        if (mData) {
+                            mData = JSON.parse(mData);
+                            const globalConfig = getGlobalConfig();
+                            let mShiftMoney = 0;
+                            globalConfig.shifts.forEach(s => {
+                                if (mData.activeShifts && mData.activeShifts.includes(s.id)) {
+                                    mShiftMoney += (mData.shiftCounts[s.id] || 0) * s.rate;
+                                }
+                            });
+                            total += (Number(mData.baseSalary) || 0) + mShiftMoney;
+                        }
+                    }
+                }
+            }
+            return total;
+        }
+
+        function calculateCumulativeExpense() {
+            let total = 0;
+            const yearSelect = document.getElementById('selectYearOnly');
+
+            for (let i = 0; i < yearSelect.options.length; i++) {
+                const y = yearSelect.options[i].value;
+                for (let m = 1; m <= 12; m++) {
+                    const mStr = String(m).padStart(2, '0');
+                    const mKey = `${y}-${mStr}`;
+                    if (mKey <= currentMonthKey) {
+                        let mData = localStorage.getItem(`app_month_${mKey}`);
+                        if (mData) {
+                            mData = JSON.parse(mData);
+                            const globalConfig = getGlobalConfig();
+                            let mExp = 0;
+                            globalConfig.expenses.forEach(e => {
+                                mExp += Number(mData.expenses[e.id] || 0);
+                            });
+                            if (mData.customExpenses) {
+                                mData.customExpenses.forEach(ce => {
+                                    mExp += Number(ce.amount || 0);
+                                });
+                            }
+                            let mFood = Object.values(mData.dailyFood || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+                            mExp += mFood;
+                            total += mExp;
+                        }
+                    }
+                }
+            }
+            return total;
+        }
+
+        function renderExpensesTab(data, globalConfig) {
+            const container = document.getElementById('fixedExpensesContainer');
+            container.innerHTML = '';
+
+            globalConfig.expenses.forEach(exp => {
+                const val = data.expenses[exp.id] !== undefined ? data.expenses[exp.id] : exp.defaultAmount;
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between gap-2";
+                div.innerHTML = `
+                    <span class="text-xs text-slate-600 font-medium">${exp.name}</span>
+                    <input type="number" min="0" value="${val}" oninput="validateNumber(this); updateExpenseVal('${exp.id}', this.value)" class="w-28 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-right text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                `;
+                container.appendChild(div);
+            });
+
+            if (data.customExpenses) {
+                data.customExpenses.forEach((ce, index) => {
+                    const div = document.createElement('div');
+                    div.className = "flex items-center justify-between gap-2";
+                    div.innerHTML = `
+                        <div class="flex items-center gap-1 flex-1">
+                            <button onclick="removeCustomExpense(${index})" class="text-rose-400 hover:text-rose-600 text-xs">✕</button>
+                            <span class="text-xs text-slate-600 font-medium truncate">${ce.name}</span>
+                        </div>
+                        <input type="number" min="0" value="${ce.amount}" oninput="validateNumber(this); updateCustomExpenseVal(${index}, this.value)" class="w-28 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-right text-xs font-semibold text-slate-700">
+                    `;
+                    container.appendChild(div);
+                });
+            }
+
+            const foodContainer = document.getElementById('dailyFoodContainer');
+            foodContainer.innerHTML = '';
+            let totalFood = 0;
+
+            for (let day = 1; day <= 31; day++) {
+                const fVal = data.dailyFood[day] || '';
+                if(fVal) totalFood += Number(fVal);
+
+                const cell = document.createElement('div');
+                cell.className = "flex flex-col bg-slate-50 border border-slate-200 rounded-lg p-1 text-center";
+                cell.innerHTML = `
+                    <span class="text-[10px] text-slate-400 font-medium">ว.${day}</span>
+                    <input type="number" min="0" value="${fVal}" placeholder="0" oninput="validateNumber(this); updateDailyFood(${day}, this.value)" class="w-full bg-transparent text-center text-xs font-semibold text-indigo-600 focus:outline-none">
+                `;
+                foodContainer.appendChild(cell);
+            }
+            document.getElementById('totalDailyFood').innerText = `รวม: ${totalFood.toLocaleString()} บาท`;
+        }
+
+        function updateExpenseVal(expId, val) {
+            let data = getMonthData(currentMonthKey);
+            data.expenses[expId] = Number(val) || 0;
+            localStorage.setItem(`app_month_${currentMonthKey}`, JSON.stringify(data));
+        }
+
+        function updateCustomExpenseVal(index, val) {
+            let data = getMonthData(currentMonthKey);
+            data.customExpenses[index].amount = Number(val) || 0;
+            localStorage.setItem(`app_month_${currentMonthKey}`, JSON.stringify(data));
+        }
+
+        function updateDailyFood(day, val) {
+            let data = getMonthData(currentMonthKey);
+            data.dailyFood[day] = Number(val) || 0;
+            localStorage.setItem(`app_month_${currentMonthKey}`, JSON.stringify(data));
+            
+            let totalFood = Object.values(data.dailyFood).reduce((a, b) => a + (Number(b) || 0), 0);
+            document.getElementById('totalDailyFood').innerText = `รวม: ${totalFood.toLocaleString()} บาท`;
+        }
+
+        function addCustomExpenseField() {
+            const name = prompt("กรอกชื่อรายการรายจ่าย/เงินออมเพิ่มเติม:");
+            if (!name) return;
+            const amount = prompt("กรอกจำนวนเงิน:", "0");
+            
+            let data = getMonthData(currentMonthKey);
+            if (!data.customExpenses) data.customExpenses = [];
+            data.customExpenses.push({ name, amount: Number(amount) || 0 });
+            localStorage.setItem(`app_month_${currentMonthKey}`, JSON.stringify(data));
+            loadAppData();
+        }
+
+        function removeCustomExpense(index) {
+            let data = getMonthData(currentMonthKey);
+            data.customExpenses.splice(index, 1);
+            localStorage.setItem(`app_month_${currentMonthKey}`, JSON.stringify(data));
+            loadAppData();
+        }
+
+        function updateSummaryTab() {
+            const data = getMonthData(currentMonthKey);
+            const globalConfig = getGlobalConfig();
+
+            let totalShiftsMoney = 0;
+            globalConfig.shifts.forEach(s => {
+                if (data.activeShifts && data.activeShifts.includes(s.id)) {
+                    totalShiftsMoney += (data.shiftCounts[s.id] || 0) * s.rate;
+                }
+            });
+            const totalIncome = (Number(data.baseSalary) || 0) + totalShiftsMoney;
+
+            let totalExpenses = 0;
+            globalConfig.expenses.forEach(e => {
+                totalExpenses += Number(data.expenses[e.id] || 0);
+            });
+            if (data.customExpenses) {
+                data.customExpenses.forEach(ce => {
+                    totalExpenses += Number(ce.amount || 0);
+                });
+            }
+            let totalFood = Object.values(data.dailyFood || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+            totalExpenses += totalFood;
+
+            const netBalance = totalIncome - totalExpenses;
+
+            document.getElementById('sumTotalIncome').innerText = `${totalIncome.toLocaleString()} บาท`;
+            document.getElementById('sumTotalExpense').innerText = `${totalExpenses.toLocaleString()} บาท`;
+            document.getElementById('sumExpenseBreakdown').innerText = `${(totalExpenses - totalFood).toLocaleString()} + อาหาร ${totalFood.toLocaleString()} บาท`;
+            
+            const netEl = document.getElementById('sumNetBalance');
+            netEl.innerText = `${netBalance.toLocaleString()} บาท`;
+            netEl.className = netBalance >= 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold";
+
+            document.getElementById('cumulativeExpense').innerText = `${calculateCumulativeExpense().toLocaleString()} บาท`;
+
+            const savingsContainer = document.getElementById('savingsAccumulationContainer');
+            savingsContainer.innerHTML = `
+                <div class="flex justify-between text-slate-600">
+                    <span>เงินเก็บสะสมประจำเดือน:</span>
+                    <span class="font-semibold">${(Number(data.expenses['savings']) || 0).toLocaleString()} ฿</span>
+                </div>
+                <div class="flex justify-between text-slate-600">
+                    <span>เงินเที่ยวประจำเดือน:</span>
+                    <span class="font-semibold">${(Number(data.expenses['travel']) || 0).toLocaleString()} ฿</span>
+                </div>
+                <div class="flex justify-between text-slate-600">
+                    <span>เงินสำรองเลี้ยงชีพ:</span>
+                    <span class="font-semibold">${(Number(data.expenses['provident']) || 0).toLocaleString()} ฿</span>
+                </div>
+            `;
+
+            let trendText = `ในเดือนนี้คุณมีรายได้รวม ${totalIncome.toLocaleString()} บาท และมีรายจ่ายรวม ${totalExpenses.toLocaleString()} บาท `;
+            if (netBalance > 0) {
+                trendText += `ยอดเงินเหลือสุทธิถือว่าอยู่ในเกณฑ์ที่ดี (${netBalance.toLocaleString()} บาท) มีเงินเหลือเก็บออมเพิ่มขึ้น แนะนำให้รักษาวินัยทางการเงินระดับนี้ต่อเนื่องครับ`;
+            } else {
+                trendText += `ยอดเงินติดลบหรือเหลือน้อยเกินไป แนะนำให้ตรวจสอบรายจ่ายที่ไม่จำเป็นหรือเพิ่มเวรเพื่อเสริมสภาพคล่อง`;
+            }
+            document.getElementById('trendAnalysisText').innerText = trendText;
+
+            renderCharts(totalIncome, totalExpenses, data, globalConfig, totalFood);
+        }
+
+        function renderCharts(totalIncome, totalExpenses, data, globalConfig, totalFood) {
+            const ctx1 = document.getElementById('incomeExpenseChart').getContext('2d');
+            if (incomeExpenseChartInstance) incomeExpenseChartInstance.destroy();
+
+            incomeExpenseChartInstance = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: ['รายได้ทั้งหมด', 'รายจ่ายทั้งหมด'],
+                    datasets: [{
+                        data: [totalIncome, totalExpenses],
+                        backgroundColor: ['#6366f1', '#f43f5e'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { family: 'Prompt', size: 11 } } }
+                    }
+                }
+            });
+
+            const ctx2 = document.getElementById('expenseBreakdownChart').getContext('2d');
+            if (expenseBreakdownChartInstance) expenseBreakdownChartInstance.destroy();
+
+            let expLabels = [];
+            let expValues = [];
+            globalConfig.expenses.forEach(e => {
+                expLabels.push(e.name);
+                expValues.push(Number(data.expenses[e.id] || 0));
+            });
+            if (data.customExpenses) {
+                data.customExpenses.forEach(ce => {
+                    expLabels.push(ce.name);
+                    expValues.push(Number(ce.amount || 0));
+                });
+            }
+            expLabels.push('ค่าอาหารรวม');
+            expValues.push(totalFood);
+
+            expenseBreakdownChartInstance = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: expLabels,
+                    datasets: [{
+                        label: 'จำนวนเงิน (บาท)',
+                        data: expValues,
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { font: { family: 'Prompt', size: 9 }, maxRotation: 45, minRotation: 45 } },
+                        y: { ticks: { font: { family: 'Prompt', size: 10 } } }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // Backup and Restore Functions
+        function backupAllData() {
+            let allData = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                let key = localStorage.key(i);
+                if (key.startsWith('app_')) {
+                    allData[key] = localStorage.getItem(key);
+                }
+            }
+            
+            if (Object.keys(allData).length === 0) {
+                alert('ยังไม่มีข้อมูลให้สำรอง');
+                return;
+            }
+
+            let blob = new Blob([JSON.stringify(allData, null, 2)], {type: "application/json"});
+            let link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Backup_Shift_Finance_${new Date().toISOString().slice(0,10)}.json`;
+            link.click();
+        }
+
+        function restoreAllData(event) {
+            let file = event.target.files[0];
+            if (!file) return;
+
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let allData = JSON.parse(e.target.result);
+                    if (confirm('การกู้คืนจะแทนที่ข้อมูลปัจจุบันด้วยข้อมูลจากไฟล์สำรอง คุณต้องการดำเนินการต่อหรือไม่?')) {
+                        for (let key in allData) {
+                            if (key.startsWith('app_')) {
+                                localStorage.setItem(key, allData[key]);
+                            }
+                        }
+                        alert('กู้คืนข้อมูลสำเร็จ!');
+                        location.reload();
+                    }
+                } catch (err) {
+                    alert('ไฟล์สำรองไม่ถูกต้องหรือเสียหาย');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function exportToExcel() {
+            const data = getMonthData(currentMonthKey);
+            const globalConfig = getGlobalConfig();
+            const monthText = document.getElementById('selectMonthOnly').selectedOptions[0].text;
+            const yearText = document.getElementById('selectYearOnly').selectedOptions[0].text;
+
+            let csvContent = "\uFEFF";
+            csvContent += `รายงานสรุปเวรและรายรับ-รายจ่าย ประจำเดือน ${monthText} ${yearText}\n\n`;
+
+            csvContent += "=== รายรับ ===\n";
+            csvContent += "รายการ,จำนวน,เรทเงิน (บาท),รวมเป็นเงิน (บาท)\n";
+            csvContent += `เงินเดือนพื้นฐาน,1,${data.baseSalary || 0},${data.baseSalary || 0}\n`;
+
+            let totalShiftsMoney = 0;
+            globalConfig.shifts.forEach(s => {
+                if (data.activeShifts && data.activeShifts.includes(s.id)) {
+                    const count = data.shiftCounts[s.id] || 0;
+                    const sum = count * s.rate;
+                    totalShiftsMoney += sum;
+                    if (count > 0) {
+                        csvContent += `"${s.name}",${count},${s.rate},${sum}\n`;
+                    }
+                }
+            });
+            const totalIncome = (Number(data.baseSalary) || 0) + totalShiftsMoney;
+            csvContent += `รวมรายรับทั้งสิ้น,,,${totalIncome}\n\n`;
+
+            csvContent += "=== รายจ่ายและเงินออม ===\n";
+            csvContent += "รายการ,จำนวนเงิน (บาท)\n";
+            let totalExpenses = 0;
+            globalConfig.expenses.forEach(e => {
+                const val = Number(data.expenses[e.id] || 0);
+                totalExpenses += val;
+                csvContent += `"${e.name}",${val}\n`;
+            });
+
+            if (data.customExpenses) {
+                data.customExpenses.forEach(ce => {
+                    const val = Number(ce.amount || 0);
+                    totalExpenses += val;
+                    csvContent += `"${ce.name}",${val}\n`;
+                });
+            }
+
+            let totalFood = 0;
+            for (let day = 1; day <= 31; day++) {
+                totalFood += Number(data.dailyFood[day] || 0);
+            }
+            totalExpenses += totalFood;
+            csvContent += `"ค่าอาหารประจำวันรวมทุกวัน",${totalFood}\n`;
+            csvContent += `รวมรายจ่ายทั้งสิ้น,${totalExpenses}\n\n`;
+
+            csvContent += "=== สรุปผลสุทธิประจำเดือน ===\n";
+            csvContent += `รายได้ทั้งหมด,${totalIncome}\n`;
+            csvContent += `รายจ่ายทั้งหมด,${totalExpenses}\n`;
+            csvContent += `เงินเหลือสุทธิประจำเดือน,${totalIncome - totalExpenses}\n`;
+            csvContent += `รายได้สะสมถึงเดือนล่าสุด,${calculateCumulativeIncome()}\n`;
+            csvContent += `รายจ่ายสะสมถึงเดือนล่าสุด,${calculateCumulativeExpense()}\n`;
+
+            const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Financial_Report_${currentMonthKey}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function openShiftSelector() {
+            const globalConfig = getGlobalConfig();
+            const data = getMonthData(currentMonthKey);
+            const list = document.getElementById('shiftSelectorList');
+            list.innerHTML = '';
+
+            globalConfig.shifts.forEach(shift => {
+                const isChecked = data.activeShifts.includes(shift.id) ? 'checked' : '';
+                const div = document.createElement('label');
+                div.className = "flex items-center justify-between p-2.5 hover:bg-slate-50 rounded-xl cursor-pointer border border-slate-100";
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" value="${shift.id}" ${isChecked} class="shift-checkbox w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+                        <span class="text-xs font-medium text-slate-700">${shift.name}</span>
+                    </div>
+                    <span class="text-xs text-slate-400">${shift.rate.toLocaleString()} ฿</span>
+                `;
+                list.appendChild(div);
+            });
+
+            document.getElementById('shiftSelectorModal').classList.remove('hidden');
+        }
+
+        function closeShiftSelector() {
+            document.getElementById('shiftSelectorModal').classList.add('hidden');
+        }
+
+        function selectAllShifts(select) {
+            const checkboxes = document.querySelectorAll('.shift-checkbox');
+            checkboxes.forEach(cb => cb.checked = select);
+        }
+
+        function saveSelectedShifts() {
+            const checkboxes = document.querySelectorAll('.shift-checkbox');
+            let active = [];
+            checkboxes.forEach(cb => {
+                if (cb.checked) active.push(cb.value);
+            });
+
+            let data = getMonthData(currentMonthKey);
+            data.activeShifts = active;
+            localStorage.setItem(`app_month_${currentMonthKey}`, JSON.stringify(data));
+            
+            closeShiftSelector();
+            loadAppData();
+        }
+
+        function copyFromPreviousMonth() {
+            const mSelect = document.getElementById('selectMonthOnly');
+            const ySelect = document.getElementById('selectYearOnly');
+            
+            let m = parseInt(mSelect.value) - 1;
+            let y = parseInt(ySelect.value);
+            
+            if (m < 1) {
+                m = 12;
+                y -= 1;
+            }
+            
+            const prevMonthKey = `${y}-${String(m).padStart(2, '0')}`;
+            const prevData = localStorage.getItem(`app_month_${prevMonthKey}`);
+            
+            if (!prevData) {
+                alert('ไม่พบข้อมูลการบันทึกในเดือนก่อนหน้า');
+                return;
+            }
+
+            if (confirm(`คุณต้องการคัดลอกข้อมูลเวรและเรทจากเดือน ${m}/${y + 543} มายังเดือนนี้ใช่หรือไม่?`)) {
+                localStorage.setItem(`app_month_${currentMonthKey}`, prevData);
+                loadAppData();
+                alert('คัดลอกข้อมูลสำเร็จ!');
+            }
+        }
+
+        function openSettingsModal() {
+            const globalConfig = getGlobalConfig();
+            const list = document.getElementById('rateEditorList');
+            list.innerHTML = '';
+
+            globalConfig.shifts.forEach((shift, index) => {
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200";
+                div.innerHTML = `
+                    <span class="text-xs font-medium text-slate-700 flex-1 truncate">${shift.name}</span>
+                    <input type="number" min="0" value="${shift.rate}" oninput="validateNumber(this); updateGlobalRate(${index}, this.value)" class="w-24 px-2 py-1 bg-white border border-slate-200 rounded-lg text-right text-xs font-semibold text-indigo-600">
+                `;
+                list.appendChild(div);
+            });
+
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.add('hidden');
+            loadAppData();
+        }
+
+        function updateGlobalRate(index, val) {
+            let globalConfig = getGlobalConfig();
+            globalConfig.shifts[index].rate = Number(val) || 0;
+            saveGlobalConfig(globalConfig);
+        }
+
+        function addNewCustomShift() {
+            const nameInput = document.getElementById('newShiftName');
+            const rateInput = document.getElementById('newShiftRate');
+            const name = nameInput.value.trim();
+            const rate = Number(rateInput.value);
+
+            if (!name || isNaN(rate)) {
+                alert('กรุณากรอกชื่อเวรและเรทเงินให้ถูกต้อง');
+                return;
+            }
+
+            let globalConfig = getGlobalConfig();
+            const newId = 'custom_' + Date.now();
+            globalConfig.shifts.push({ id: newId, name: name, rate: rate, category: 'กำหนดเอง' });
+            saveGlobalConfig(globalConfig);
+
+            let data = getMonthData(currentMonthKey);
+            if (!data.activeShifts) data.activeShifts = [];
+            data.activeShifts.push(newId);
+            localStorage.setItem(`app_month_${currentMonthKey}`, JSON.stringify(data));
+
+            nameInput.value = '';
+            rateInput.value = '';
+            openSettingsModal();
+        }
+    </script>
+</body>
+</html>
